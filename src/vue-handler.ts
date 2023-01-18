@@ -1,4 +1,4 @@
-import { CodegenResult, compile, CompilerError, NodeTypes, RootNode, TemplateChildNode } from '@vue/compiler-dom';
+import { CodegenResult, compile, CompilerError, Node, NodeTypes, RootNode, TemplateChildNode } from '@vue/compiler-dom';
 import { showMessage } from './helper';
 import * as vscode from 'vscode';
 import jsConvert from 'js-convert-case';
@@ -29,6 +29,7 @@ export function parseVue(code: string) {
             console.error(error);
             showMessage('Parsing failed: ' + error.message, 'error');
         },
+        
 
     });
 }
@@ -63,12 +64,12 @@ export function getElementsInRange(originalCode: string, rootNode: RootNode, sel
     const startCharacter = selection.start.character + 1;
     const endCharacter = selection.end.character + 1;
     
-    let nodeOut: RootNode | TemplateChildNode | undefined = undefined;
+    let nodeOut: Node | undefined = undefined;
 
     traverseVueNode(rootNode, node => {
         // console.log('Traversed', node.type, node.loc);
         // console.log(node.loc.start.line, relativeStartLine, node.loc.start.column, startCharacter);
-        if (node.loc && node.loc.start.line === relativeStartLine && node.loc.start.column === startCharacter) {
+        if (node.loc && node.loc.start.line === relativeStartLine && node.loc.start.column === startCharacter && nodeOut === undefined) {
             nodeOut = node;
             return false;
         }
@@ -77,17 +78,19 @@ export function getElementsInRange(originalCode: string, rootNode: RootNode, sel
     return nodeOut;
 }
 
-export function traverseVueNode(node: RootNode | TemplateChildNode, callback: (node: RootNode | TemplateChildNode) => boolean | void) {
+export function traverseVueNode(node: Node, callback: (node: Node) => boolean | void) {
     const result = callback(node);
     if (result === false) {return;};
     
-    if (
-        (node as any).children !== undefined
-      /*node.type === NodeTypes.ELEMENT ||
-      node.type === NodeTypes.ROOT ||
-      node.type === NodeTypes.COMPOUND_EXPRESSION*/
-    ) {
-      (node as any).children.forEach((child: any) => traverseVueNode(child, callback));
+    if ((node as any).children !== undefined) {
+      (node as any).children.forEach((child: any) =>
+        traverseVueNode(child, callback)
+      );
+    }
+    if ((node as any).props !== undefined) {
+      (node as any).props.forEach((prop: any) =>
+        traverseVueNode(prop, callback)
+      );
     }
 }
 
